@@ -1,622 +1,110 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="uk">
-
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Frontline Dodge — військова аркада</title>
-    <style>
-        :root {
-            color-scheme: dark;
-        }
+<meta charset="UTF-8">
+<title>Збери карту Європи</title>
 
-        html,
-        body {
-            margin: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background: #050814;
-            font-family: system-ui, Arial, sans-serif;
-            color: #e6ebff;
-            user-select: none;
-        }
+<style>
+body{
+font-family: Arial;
+text-align:center;
+background:#eef6ff;
+}
 
-        canvas {
-            position: fixed;
-            inset: 0;
-            width: 100vw;
-            height: 100vh;
-            display: block;
-            background: radial-gradient(1400px 900px at 50% -15%, #1e2e4d, #0a0f1f 60%, #060914);
-            touch-action: none;
-        }
+#map{
+width:500px;
+height:350px;
+margin:auto;
+border:3px solid #444;
+display:flex;
+flex-wrap:wrap;
+}
 
-        .hud {
-            position: fixed;
-            top: 12px;
-            left: 12px;
-            right: 12px;
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            justify-content: space-between;
-            padding: 8px 10px;
-            background: rgba(7, 10, 25, 0.8);
-            border: 1px solid rgba(110, 140, 255, 0.35);
-            border-radius: 12px;
-            backdrop-filter: blur(6px);
-            z-index: 10;
-        }
+.slot{
+width:100px;
+height:100px;
+border:1px dashed gray;
+display:flex;
+align-items:center;
+justify-content:center;
+}
 
-        .left {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
+.country{
+padding:8px;
+margin:5px;
+background:#4CAF50;
+color:white;
+cursor:grab;
+display:inline-block;
+}
 
-        .pill {
-            background: rgba(14, 20, 46, 0.95);
-            border: 1px solid rgba(90, 110, 200, 0.7);
-            padding: 6px 10px;
-            border-radius: 999px;
-            font-weight: 800;
-            font-size: 14px;
-            letter-spacing: .2px;
-        }
-
-        button {
-            background: #3a66ff;
-            border: none;
-            color: white;
-            font-weight: 900;
-            padding: 8px 12px;
-            border-radius: 10px;
-            cursor: pointer;
-            box-shadow: 0 6px 16px #0007;
-        }
-
-        button:active {
-            transform: translateY(1px);
-        }
-
-        .tip {
-            position: fixed;
-            bottom: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 13px;
-            opacity: .9;
-            z-index: 10;
-            background: rgba(7, 10, 25, 0.7);
-            padding: 6px 10px;
-            border-radius: 999px;
-            border: 1px solid rgba(90, 110, 200, 0.35);
-            white-space: nowrap;
-        }
-    </style>
+.correct{
+background:#2196F3;
+}
+</style>
 </head>
 
 <body>
-    <div class="hud">
-        <div class="left">
-            <div class="pill">Секунди: <span id="time">0</span></div>
-            <div class="pill">Очки: <span id="score">0</span></div>
-            <div class="pill">Рекорд: <span id="best">0</span></div>
-            <div class="pill">HP: <span id="hp">3</span></div>
-            <div class="pill">Патрони: <span id="ammo">12</span></div>
-            <div class="pill">Рівень: <span id="level">1</span></div>
-        </div>
-        <div class="right">
-            <button id="restart">Перезапуск</button>
-        </div>
-    </div>
 
-    <canvas id="game"></canvas>
-    <div class="tip">← → або A/D. Пробіл — вогонь. P — пауза. На телефоні: тягни БТР.</div>
+<h1>Збери карту Європи</h1>
 
-    <script>
-        // ================= Canvas fullscreen =================
-        const canvas = document.getElementById("game");
-        const ctx = canvas.getContext("2d");
+<p>Перетягни країну на правильне місце</p>
 
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        window.addEventListener("resize", resize);
-        resize();
+<div id="map">
 
-        let W = canvas.width;
-        let H = canvas.height;
+<div class="slot" data-country="Франція"></div>
+<div class="slot" data-country="Німеччина"></div>
+<div class="slot" data-country="Італія"></div>
+<div class="slot" data-country="Іспанія"></div>
 
-        function syncWH() { W = canvas.width; H = canvas.height; }
+</div>
 
-        // ================= HUD =================
-        const timeEl = document.getElementById("time");
-        const scoreEl = document.getElementById("score");
-        const bestEl = document.getElementById("best");
-        const hpEl = document.getElementById("hp");
-        const ammoEl = document.getElementById("ammo");
-        const levelEl = document.getElementById("level");
-        const restartBtn = document.getElementById("restart");
+<h3>Країни</h3>
 
-        // ================= Sprites via SVG data-URI =================
-        const apcImg = new Image();      // БТР (гравець)
-        const droneImg = new Image();    // дрон-камікадзе
-        const shellImg = new Image();    // снаряд
-        const medImg = new Image();      // аптечка
-        const ammoImg = new Image();     // ящик патронів
-        const explosionImg = new Image();// вибух
+<div id="countries">
 
-        apcImg.src = "data:image/svg+xml;utf8," + encodeURIComponent(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="120" height="80">
-      <defs>
-        <linearGradient id="a" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stop-color="#6bd48c"/>
-          <stop offset="100%" stop-color="#1b5a34"/>
-        </linearGradient>
-      </defs>
-      <rect x="8" y="28" width="104" height="30" rx="10" fill="url(#a)" stroke="#0b1020" stroke-width="4"/>
-      <rect x="28" y="18" width="50" height="18" rx="6" fill="#2a7a46" stroke="#0b1020" stroke-width="4"/>
-      <rect x="70" y="12" width="30" height="8" rx="4" fill="#2a7a46" stroke="#0b1020" stroke-width="4"/>
-      <rect x="98" y="10" width="14" height="6" rx="3" fill="#2a7a46" stroke="#0b1020" stroke-width="4"/>
-      <circle cx="30" cy="62" r="10" fill="#111" stroke="#0b1020" stroke-width="4"/>
-      <circle cx="60" cy="62" r="10" fill="#111" stroke="#0b1020" stroke-width="4"/>
-      <circle cx="90" cy="62" r="10" fill="#111" stroke="#0b1020" stroke-width="4"/>
-    </svg>
-  `);
+<div class="country" draggable="true">Франція</div>
+<div class="country" draggable="true">Німеччина</div>
+<div class="country" draggable="true">Італія</div>
+<div class="country" draggable="true">Іспанія</div>
 
-        droneImg.src = "data:image/svg+xml;utf8," + encodeURIComponent(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="90" height="70">
-      <circle cx="45" cy="35" r="18" fill="#ff4b4b" stroke="#0b1020" stroke-width="4"/>
-      <rect x="4" y="30" width="24" height="10" rx="4" fill="#cfd3dc" stroke="#0b1020" stroke-width="3"/>
-      <rect x="62" y="30" width="24" height="10" rx="4" fill="#cfd3dc" stroke="#0b1020" stroke-width="3"/>
-      <rect x="38" y="6" width="14" height="8" rx="3" fill="#9aa4b2" stroke="#0b1020" stroke-width="3"/>
-      <path d="M45 14 C52 6, 62 6, 66 0" stroke="#ffd34b" stroke-width="4" fill="none"/>
-      <circle cx="66" cy="0" r="4" fill="#ffd34b"/>
-    </svg>
-  `);
+</div>
 
-        shellImg.src = "data:image/svg+xml;utf8," + encodeURIComponent(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="40">
-      <rect x="4" y="2" width="10" height="30" rx="4" fill="#d7dbe6" stroke="#0b1020" stroke-width="3"/>
-      <rect x="4" y="26" width="10" height="12" rx="2" fill="#f1b54a" stroke="#0b1020" stroke-width="3"/>
-    </svg>
-  `);
+<script>
 
-        medImg.src = "data:image/svg+xml;utf8," + encodeURIComponent(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="44" height="44">
-      <rect x="4" y="6" width="36" height="32" rx="8" fill="#e6f1ff" stroke="#0b1020" stroke-width="4"/>
-      <rect x="18" y="12" width="8" height="20" rx="2" fill="#3a66ff"/>
-      <rect x="12" y="18" width="20" height="8" rx="2" fill="#3a66ff"/>
-    </svg>
-  `);
+let countries=document.querySelectorAll(".country");
+let slots=document.querySelectorAll(".slot");
 
-        ammoImg.src = "data:image/svg+xml;utf8," + encodeURIComponent(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="36">
-      <rect x="4" y="6" width="40" height="26" rx="6" fill="#c9a24b" stroke="#0b1020" stroke-width="4"/>
-      <rect x="10" y="12" width="28" height="6" rx="3" fill="#9a7430"/>
-      <rect x="10" y="20" width="28" height="6" rx="3" fill="#9a7430"/>
-    </svg>
-  `);
+countries.forEach(c=>{
+c.addEventListener("dragstart",dragStart)
+})
 
-        explosionImg.src = "data:image/svg+xml;utf8," + encodeURIComponent(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80">
-      <circle cx="40" cy="40" r="30" fill="#ffb74b" />
-      <circle cx="40" cy="40" r="20" fill="#ff4b4b" />
-      <circle cx="40" cy="40" r="10" fill="#fff2b0" />
-    </svg>
-  `);
+slots.forEach(s=>{
+s.addEventListener("dragover",e=>e.preventDefault())
+s.addEventListener("drop",drop)
+})
 
-        // ================= Game state =================
-        const keys = new Set();
-        window.addEventListener("keydown", e => keys.add(e.key.toLowerCase()));
-        window.addEventListener("keyup", e => keys.delete(e.key.toLowerCase()));
+let dragged
 
-        let dragging = false;
-        function pointerPos(ev) {
-            const r = canvas.getBoundingClientRect();
-            const x = (ev.clientX - r.left) * (canvas.width / r.width);
-            const y = (ev.clientY - r.top) * (canvas.height / r.height);
-            return { x, y };
-        }
-        canvas.addEventListener("pointerdown", ev => {
-            dragging = true;
-            canvas.setPointerCapture(ev.pointerId);
-            const p = pointerPos(ev);
-            player.x = p.x - player.w / 2;
-        });
-        canvas.addEventListener("pointermove", ev => {
-            if (dragging) {
-                const p = pointerPos(ev);
-                player.x = p.x - player.w / 2;
-            }
-        });
-        canvas.addEventListener("pointerup", ev => {
-            dragging = false;
-            canvas.releasePointerCapture(ev.pointerId);
-        });
+function dragStart(){
+dragged=this
+}
 
-        function clamp(v, min, max) {
-            if (v < min) v = min;
-            if (v > max) v = max;
-            return v;
-        }
+function drop(){
 
-        function rectsOverlap(a, b) {
-            let ok = true;
-            if (a.x + a.w < b.x) ok = false;
-            if (a.x > b.x + b.w) ok = false;
-            if (a.y + a.h < b.y) ok = false;
-            if (a.y > b.y + b.h) ok = false;
-            return ok;
-        }
+if(this.dataset.country===dragged.innerText){
 
-        const player = {
-            w: 110, h: 70,
-            x: 0, y: 0,
-            speed: 9,
-            vx: 0,
-            hp: 3,
-            ammo: 12,
-            fireCooldown: 0
-        };
+this.innerText=dragged.innerText
+this.classList.add("correct")
+dragged.remove()
 
-        let drones = [];
-        let shells = [];
-        let pickups = [];
-        let explosions = [];
+}else{
+alert("Неправильно!")
+}
 
-        let score = 0;
-        let best = Number(localStorage.getItem("frontline_best") || 0);
+}
 
-        let level = 1;
-        let secondsSurvived = 0;
+</script>
 
-        let spawnTimer = 0;
-        let spawnEvery = 42;
-        let droneSpeed = 2.8;
-
-        let pickupTimer = 0;
-        let pickupEvery = 360;
-
-        let gameOver = false;
-        let paused = false;
-        let started = false;
-
-        bestEl.textContent = best;
-
-        function spawnDrone() {
-            const size = 60 + Math.random() * 25;
-            const x = Math.random() * (W - size);
-            const zig = (Math.random() * 2 - 1) * 0.8;
-            drones.push({ x, y: -size, w: size, h: size, vy: droneSpeed + Math.random() * 2, vx: zig });
-        }
-
-        function spawnPickup() {
-            const r = Math.random();
-            const type = (r < 0.5) ? "ammo" : "med"; // <-- тернарний? НІ. Ой, тут є ?:, прибираю нижче.
-        }
-
-        function spawnMed() {
-            const size = 36;
-            const x = Math.random() * (W - size);
-            pickups.push({ x, y: -size, w: size, h: size, vy: 2.2, type: "med" });
-        }
-
-        function spawnAmmo() {
-            const size = 44;
-            const x = Math.random() * (W - size);
-            pickups.push({ x, y: -size, w: size, h: size, vy: 2.0, type: "ammo" });
-        }
-
-        function addExplosion(x, y, size) {
-            explosions.push({ x, y, w: size, h: size, t: 18 });
-        }
-
-        function resetGame() {
-            syncWH();
-            drones = [];
-            shells = [];
-            pickups = [];
-            explosions = [];
-
-            score = 0;
-            level = 1;
-            secondsSurvived = 0;
-
-            spawnTimer = 0;
-            spawnEvery = 42;
-            droneSpeed = 2.8;
-
-            pickupTimer = 0;
-            pickupEvery = 360;
-
-            player.hp = 3;
-            player.ammo = 12;
-            player.fireCooldown = 0;
-
-            gameOver = false;
-            paused = false;
-            started = false;
-
-            player.x = W / 2 - player.w / 2;
-            player.y = H - player.h - 18;
-            player.vx = 0;
-
-            timeEl.textContent = secondsSurvived;
-            scoreEl.textContent = score;
-            hpEl.textContent = player.hp;
-            ammoEl.textContent = player.ammo;
-            levelEl.textContent = level;
-        }
-
-        restartBtn.addEventListener("click", resetGame);
-
-        // ================= Shooting (space) =================
-        function tryFire() {
-            if (player.fireCooldown <= 0) {
-                if (player.ammo > 0) {
-                    const sx = player.x + player.w / 2 - 6;
-                    const sy = player.y - 18;
-                    shells.push({ x: sx, y: sy, w: 12, h: 26, vy: -10 });
-                    player.ammo -= 1;
-                    player.fireCooldown = 8;
-                }
-            }
-        }
-
-        // ================= Update =================
-        let frameCount = 0;
-
-        function update() {
-            syncWH();
-            player.y = H - player.h - 18;
-
-            if (paused) return;
-            if (!started) return;
-            if (gameOver) return;
-
-            frameCount++;
-
-            // seconds survived
-            if (frameCount % 60 === 0) {
-                secondsSurvived += 1;
-                level = 1 + Math.floor(secondsSurvived / 15);
-            }
-
-            // input
-            player.vx = 0;
-            if (keys.has("arrowleft")) player.vx = -player.speed;
-            if (keys.has("a")) player.vx = -player.speed;
-            if (keys.has("arrowright")) player.vx = player.speed;
-            if (keys.has("d")) player.vx = player.speed;
-
-            if (keys.has(" ")) tryFire();
-
-            player.x += player.vx;
-            player.x = clamp(player.x, 0, W - player.w);
-
-            if (player.fireCooldown > 0) player.fireCooldown -= 1;
-
-            // spawn drones
-            spawnTimer++;
-            const targetEvery = Math.max(16, 42 - level * 2);
-            spawnEvery = targetEvery;
-            droneSpeed = 2.6 + level * 0.35;
-
-            if (spawnTimer >= spawnEvery) {
-                spawnTimer = 0;
-                spawnDrone();
-            }
-
-            // spawn pickups sometimes
-            pickupTimer++;
-            const pEvery = Math.max(180, pickupEvery - level * 12);
-            pickupEvery = pEvery;
-
-            if (pickupTimer >= pickupEvery) {
-                pickupTimer = 0;
-                const r = Math.random();
-                if (r < 0.55) spawnAmmo();
-                if (r >= 0.55) spawnMed();
-            }
-
-            // update drones
-            for (let i = drones.length - 1; i >= 0; i--) {
-                const d = drones[i];
-                d.y += d.vy;
-                d.x += d.vx;
-
-                if (d.x < 0) d.vx = Math.abs(d.vx);
-                if (d.x + d.w > W) d.vx = -Math.abs(d.vx);
-
-                if (d.y > H + 80) {
-                    drones.splice(i, 1);
-                    score += 1;
-                }
-
-                if (rectsOverlap(player, d)) {
-                    drones.splice(i, 1);
-                    player.hp -= 1;
-                    addExplosion(player.x + player.w / 2 - 40, player.y - 20, 80);
-                }
-            }
-
-            // update shells
-            for (let i = shells.length - 1; i >= 0; i--) {
-                const s = shells[i];
-                s.y += s.vy;
-
-                if (s.y < -40) shells.splice(i, 1);
-
-                // hit drones
-                for (let j = drones.length - 1; j >= 0; j--) {
-                    const d = drones[j];
-                    if (rectsOverlap(s, d)) {
-                        shells.splice(i, 1);
-                        drones.splice(j, 1);
-                        score += 3;
-                        addExplosion(d.x + d.w / 2 - 40, d.y + d.h / 2 - 40, 80);
-                        break;
-                    }
-                }
-            }
-
-            // update pickups
-            for (let i = pickups.length - 1; i >= 0; i--) {
-                const p = pickups[i];
-                p.y += p.vy;
-
-                if (p.y > H + 50) pickups.splice(i, 1);
-
-                if (rectsOverlap(player, p)) {
-                    if (p.type === "med") player.hp += 1;
-                    if (p.type === "ammo") player.ammo += 6;
-                    pickups.splice(i, 1);
-                }
-            }
-
-            // clamp hp for balance
-            if (player.hp > 5) player.hp = 5;
-
-            if (player.hp <= 0) gameOver = true;
-
-            if (score > best) {
-                best = score;
-                localStorage.setItem("frontline_best", String(best));
-            }
-
-            timeEl.textContent = secondsSurvived;
-            scoreEl.textContent = score;
-            bestEl.textContent = best;
-            hpEl.textContent = player.hp;
-            ammoEl.textContent = player.ammo;
-            levelEl.textContent = level;
-        }
-
-        // ================= Draw background (parallax) =================
-        function drawParallax() {
-            // дальні гори
-            const t = frameCount * 0.2;
-            ctx.globalAlpha = 0.35;
-            ctx.fillStyle = "#0e1735";
-            for (let i = 0; i < 6; i++) {
-                const x = ((i * 520 - (t % 520)) | 0);
-                ctx.beginPath();
-                ctx.moveTo(x, H);
-                ctx.lineTo(x + 260, H - 220);
-                ctx.lineTo(x + 520, H);
-                ctx.closePath();
-                ctx.fill();
-            }
-
-            // ближні пагорби
-            const t2 = frameCount * 0.6;
-            ctx.globalAlpha = 0.6;
-            ctx.fillStyle = "#121f44";
-            for (let i = 0; i < 7; i++) {
-                const x = ((i * 420 - (t2 % 420)) | 0);
-                ctx.beginPath();
-                ctx.moveTo(x, H);
-                ctx.quadraticCurveTo(x + 210, H - 140, x + 420, H);
-                ctx.closePath();
-                ctx.fill();
-            }
-            ctx.globalAlpha = 1;
-        }
-
-        // ================= Draw =================
-        function draw() {
-            ctx.clearRect(0, 0, W, H);
-            drawParallax();
-
-            // ground line
-            ctx.fillStyle = "rgba(30,60,35,0.95)";
-            ctx.fillRect(0, H - 14, W, 14);
-
-            // drones
-            for (const d of drones) ctx.drawImage(droneImg, d.x, d.y, d.w, d.h);
-
-            // pickups
-            for (const p of pickups) {
-                if (p.type === "med") ctx.drawImage(medImg, p.x, p.y, p.w, p.h);
-                if (p.type === "ammo") ctx.drawImage(ammoImg, p.x, p.y, p.w, p.h);
-            }
-
-            // shells
-            for (const s of shells) ctx.drawImage(shellImg, s.x, s.y, s.w, s.h);
-
-            // player
-            ctx.drawImage(apcImg, player.x, player.y, player.w, player.h);
-
-            // explosions
-            for (let i = explosions.length - 1; i >= 0; i--) {
-                const ex = explosions[i];
-                ctx.globalAlpha = ex.t / 18;
-                ctx.drawImage(explosionImg, ex.x, ex.y, ex.w, ex.h);
-                ctx.globalAlpha = 1;
-                ex.t -= 1;
-                if (ex.t <= 0) explosions.splice(i, 1);
-            }
-
-            // START screen
-            if (!started) {
-                ctx.fillStyle = "rgba(0,0,0,0.65)";
-                ctx.fillRect(0, 0, W, H);
-                ctx.fillStyle = "#fff";
-                ctx.textAlign = "center";
-                ctx.font = "900 56px system-ui";
-                ctx.fillText("FRONTLINE DODGE", W / 2, H / 2 - 30);
-                ctx.font = "500 20px system-ui";
-                ctx.fillText("Виживи під атакою дронів-камікадзе", W / 2, H / 2 + 10);
-                ctx.font = "700 18px system-ui";
-                ctx.fillText("Натисни Enter або торкнись екрану", W / 2, H / 2 + 50);
-            }
-
-            // PAUSE overlay
-            if (paused && started && !gameOver) {
-                ctx.fillStyle = "rgba(0,0,0,0.55)";
-                ctx.fillRect(0, 0, W, H);
-                ctx.fillStyle = "#fff";
-                ctx.textAlign = "center";
-                ctx.font = "800 46px system-ui";
-                ctx.fillText("ПАУЗА", W / 2, H / 2);
-                ctx.font = "500 18px system-ui";
-                ctx.fillText("Натисни P щоб продовжити", W / 2, H / 2 + 30);
-            }
-
-            // GAME OVER overlay
-            if (gameOver) {
-                ctx.fillStyle = "rgba(0,0,0,0.65)";
-                ctx.fillRect(0, 0, W, H);
-                ctx.fillStyle = "#fff";
-                ctx.textAlign = "center";
-                ctx.font = "900 56px system-ui";
-                ctx.fillText("МІСІЮ ЗІРВАНО", W / 2, H / 2 - 10);
-                ctx.font = "500 20px system-ui";
-                ctx.fillText("Перезапуск — щоб спробувати ще раз", W / 2, H / 2 + 30);
-            }
-        }
-
-        function loop() {
-            update();
-            draw();
-            requestAnimationFrame(loop);
-        }
-
-        // старт/пауза обробка
-        window.addEventListener("keydown", e => {
-            if (e.key.toLowerCase() === "enter") started = true;
-            if (e.key.toLowerCase() === "p") paused = !paused;
-        });
-        canvas.addEventListener("pointerdown", () => { if (!started) started = true; });
-
-        resetGame();
-        loop();
-    </script>
 </body>
-
 </html>
