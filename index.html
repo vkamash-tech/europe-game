@@ -1,109 +1,310 @@
 <!DOCTYPE html>
 <html lang="uk">
 <head>
-<meta charset="UTF-8">
-<title>Збери карту Європи</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoExplorer: Подорож Світом</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #27ae60;
+            --gold: #f1c40f;
+            --light: #ecf0f1;
+        }
 
-<style>
-body{
-font-family: Arial;
-text-align:center;
-background:#eef6ff;
-}
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a1a;
+            color: var(--light);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
 
-#map{
-width:500px;
-height:350px;
-margin:auto;
-border:3px solid #444;
-display:flex;
-flex-wrap:wrap;
-}
+        /* Шапка з прогресом */
+        header {
+            background: var(--primary);
+            padding: 15px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
 
-.slot{
-width:100px;
-height:100px;
-border:1px dashed gray;
-display:flex;
-align-items:center;
-justify-content:center;
-}
+        .stats-item {
+            display: inline-block;
+            margin-right: 20px;
+            font-weight: bold;
+        }
 
-.country{
-padding:8px;
-margin:5px;
-background:#4CAF50;
-color:white;
-cursor:grab;
-display:inline-block;
-}
+        /* Карта */
+        #game-container {
+            position: relative;
+            flex-grow: 1;
+            background: #2980b9; /* Океан */
+            overflow: auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
 
-.correct{
-background:#2196F3;
-}
-</style>
+        #world-map {
+            position: relative;
+            width: 1200px;
+            height: 700px;
+            background: url('https://www.transparenttextures.com/patterns/paper.png'), linear-gradient(to bottom, #3498db, #2980b9);
+            border-radius: 15px;
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.5);
+        }
+
+        /* Міста/Країни на карті */
+        .country-node {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            background: #95a5a6;
+            border: 3px solid #7f8c8d;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            transition: all 0.3s;
+            z-index: 2;
+        }
+
+        .country-node.unlocked {
+            background: var(--accent);
+            border-color: white;
+            box-shadow: 0 0 20px var(--accent);
+        }
+
+        .country-node:hover {
+            transform: scale(1.2);
+            z-index: 5;
+        }
+
+        .label {
+            position: absolute;
+            bottom: -25px;
+            background: rgba(0,0,0,0.7);
+            padding: 2px 8px;
+            border-radius: 5px;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        /* Панель Паспорта */
+        #sidebar {
+            position: fixed;
+            right: -300px;
+            top: 0;
+            width: 300px;
+            height: 100%;
+            background: #34495e;
+            transition: 0.5s;
+            padding: 20px;
+            box-sizing: border-box;
+            z-index: 20;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.5);
+        }
+
+        #sidebar.active { right: 0; }
+
+        .stamp-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .stamp {
+            width: 70px;
+            height: 70px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            filter: grayscale(1);
+            opacity: 0.3;
+        }
+
+        .stamp.collected {
+            filter: grayscale(0);
+            opacity: 1;
+            background: rgba(255,255,255,0.2);
+            border: 2px solid var(--gold);
+        }
+
+        /* Модальне вікно місії */
+        #mission-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            color: #333;
+            padding: 30px;
+            border-radius: 20px;
+            width: 400px;
+            text-align: center;
+            z-index: 100;
+            box-shadow: 0 0 100px rgba(0,0,0,0.8);
+        }
+
+        .btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+            font-size: 16px;
+        }
+
+        #overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 90;
+        }
+    </style>
 </head>
-
 <body>
 
-<h1>Збери карту Європи</h1>
+<header>
+    <div>
+        <span class="stats-item">🌍 Рівень: <span id="lvl">1</span></span>
+        <span class="stats-item">💰 Милі: <span id="money">0</span></span>
+        <span class="stats-item">🛂 Відкрито: <span id="discovered">0</span>/9</span>
+    </div>
+    <button class="btn" onclick="togglePassport()" style="background: var(--gold); color: #000;">Мій Паспорт</button>
+</header>
 
-<p>Перетягни країну на правильне місце</p>
-
-<div id="map">
-
-<div class="slot" data-country="Франція"></div>
-<div class="slot" data-country="Німеччина"></div>
-<div class="slot" data-country="Італія"></div>
-<div class="slot" data-country="Іспанія"></div>
-
+<div id="game-container">
+    <div id="world-map">
+        </div>
 </div>
 
-<h3>Країни</h3>
+<div id="sidebar">
+    <h2>🛂 Паспорт Дослідника</h2>
+    <p>Ваші досягнення та штампи:</p>
+    <div class="stamp-grid" id="stamps"></div>
+    <button class="btn" onclick="togglePassport()">Закрити</button>
+</div>
 
-<div id="countries">
-
-<div class="country" draggable="true">Франція</div>
-<div class="country" draggable="true">Німеччина</div>
-<div class="country" draggable="true">Італія</div>
-<div class="country" draggable="true">Іспанія</div>
-
+<div id="overlay"></div>
+<div id="mission-modal">
+    <h2 id="m-title">Назва країни</h2>
+    <p id="m-desc">Опис місії...</p>
+    <div id="m-options"></div>
 </div>
 
 <script>
+    const countries = [
+        { id: 1, name: "Україна", x: 600, y: 250, icon: "🇺🇦", fact: "Найбільша країна Європи.", quest: "Столиця України?", options: ["Київ", "Львів", "Одеса"], correct: 0 },
+        { id: 2, name: "Франція", x: 500, y: 280, icon: "🇫🇷", fact: "Країна моди та вина.", quest: "Яка вежа є символом Парижа?", options: ["Пізанська", "Ейфелева", "Біг-Бен"], correct: 1 },
+        { id: 3, name: "Японія", x: 1050, y: 350, icon: "🇯🇵", fact: "Країна, де сходить сонце.", quest: "Як називається священна гора японців?", options: ["Еверест", "Говерла", "Фудзіяма"], correct: 2 },
+        { id: 4, name: "Єгипет", x: 630, y: 450, icon: "🇪🇬", fact: "Країна пірамід.", quest: "Яка найдовша річка світу тече тут?", options: ["Ніл", "Амазонка", "Дніпро"], correct: 0 },
+        { id: 5, name: "Бразилія", x: 350, y: 550, icon: "🇧🇷", fact: "Тут найбільше лісів Амазонії.", quest: "Який вид спорту найпопулярніший?", options: ["Хокей", "Футбол", "Теніс"], correct: 1 },
+        { id: 6, name: "Австралія", x: 1000, y: 600, icon: "🇦🇺", fact: "Країна-континент.", quest: "Тварина з сумкою, що живе тут?", options: ["Тигр", "Слон", "Кенгуру"], correct: 2 },
+        { id: 7, name: "Канада", x: 200, y: 200, icon: "🇨🇦", fact: "Друга за площею країна світу.", quest: "Який листок на прапорі?", options: ["Кленовий", "Дубовий", "Березовий"], correct: 0 },
+        { id: 8, name: "Італія", x: 550, y: 320, icon: "🇮🇹", fact: "Батьківщина піци.", quest: "Місто на воді?", options: ["Рим", "Венеція", "Мілан"], correct: 1 },
+        { id: 9, name: "Індія", x: 800, y: 450, icon: "🇮🇳", fact: "Країна спецій.", quest: "Яка тварина вважається священною?", options: ["Кінь", "Собака", "Корова"], correct: 2 }
+    ];
 
-let countries=document.querySelectorAll(".country");
-let slots=document.querySelectorAll(".slot");
+    let gameState = {
+        miles: 0,
+        level: 1,
+        unlocked: JSON.parse(localStorage.getItem('geo_unlocked')) || []
+    };
 
-countries.forEach(c=>{
-c.addEventListener("dragstart",dragStart)
-})
+    function initGame() {
+        const map = document.getElementById('world-map');
+        const stampsDiv = document.getElementById('stamps');
+        
+        countries.forEach(c => {
+            // Малюємо вузли на карті
+            const node = document.createElement('div');
+            node.className = `country-node ${gameState.unlocked.includes(c.id) ? 'unlocked' : ''}`;
+            node.style.left = c.x + 'px';
+            node.style.top = c.y + 'px';
+            node.innerHTML = `<span class="label">${c.name}</span>${gameState.unlocked.includes(c.id) ? c.icon : '❓'}`;
+            node.onclick = () => openMission(c);
+            map.appendChild(node);
 
-slots.forEach(s=>{
-s.addEventListener("dragover",e=>e.preventDefault())
-s.addEventListener("drop",drop)
-})
+            // Додаємо штампи в паспорт
+            const stamp = document.createElement('div');
+            stamp.className = `stamp ${gameState.unlocked.includes(c.id) ? 'collected' : ''}`;
+            stamp.id = `stamp-${c.id}`;
+            stamp.innerHTML = c.icon;
+            stampsDiv.appendChild(stamp);
+        });
+        updateUI();
+    }
 
-let dragged
+    function openMission(country) {
+        if(gameState.unlocked.includes(country.id)) {
+            alert(`Ви вже дослідили цю країну: ${country.fact}`);
+            return;
+        }
+        
+        document.getElementById('m-title').innerText = `Місія: ${country.name}`;
+        document.getElementById('m-desc').innerText = country.quest;
+        const optionsDiv = document.getElementById('m-options');
+        optionsDiv.innerHTML = '';
+        
+        country.options.forEach((opt, index) => {
+            const btn = document.createElement('button');
+            btn.className = 'btn';
+            btn.innerText = opt;
+            btn.onclick = () => checkAnswer(index, country);
+            optionsDiv.appendChild(btn);
+        });
 
-function dragStart(){
-dragged=this
-}
+        document.getElementById('overlay').style.display = 'block';
+        document.getElementById('mission-modal').style.display = 'block';
+    }
 
-function drop(){
+    function checkAnswer(idx, country) {
+        if(idx === country.correct) {
+            alert("Правильно! Країну відкрито, штамп отримано! +500 миль");
+            gameState.miles += 500;
+            gameState.unlocked.push(country.id);
+            localStorage.setItem('geo_unlocked', JSON.stringify(gameState.unlocked));
+            closeMission();
+            location.reload(); // Перезавантаження для оновлення карти
+        } else {
+            alert("Ой! Це невірна відповідь. Спробуй ще раз пізніше.");
+            closeMission();
+        }
+    }
 
-if(this.dataset.country===dragged.innerText){
+    function closeMission() {
+        document.getElementById('overlay').style.display = 'none';
+        document.getElementById('mission-modal').style.display = 'none';
+    }
 
-this.innerText=dragged.innerText
-this.classList.add("correct")
-dragged.remove()
+    function togglePassport() {
+        document.getElementById('sidebar').classList.toggle('active');
+    }
 
-}else{
-alert("Неправильно!")
-}
+    function updateUI() {
+        document.getElementById('money').innerText = gameState.miles;
+        document.getElementById('discovered').innerText = gameState.unlocked.length;
+        document.getElementById('lvl').innerText = Math.floor(gameState.unlocked.length / 3) + 1;
+    }
 
-}
-
+    initGame();
 </script>
 
 </body>
