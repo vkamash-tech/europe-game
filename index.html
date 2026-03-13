@@ -3,168 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeoEurope: Дослідник Континенту</title>
+    <title>Збери карту Європи</title>
     <style>
-        body {
-            font-family: 'Arial', sans-serif;
-            background: #1a1a2e;
-            color: white;
-            margin: 0;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-        }
-
-        header {
-            background: #16213e;
-            padding: 15px;
-            display: flex;
-            justify-content: space-around;
-            border-bottom: 2px solid #e94560;
-            font-size: 1.2rem;
-        }
-
-        #game-canvas {
-            flex-grow: 1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: #0f3460;
+        body { font-family: sans-serif; background: #f0f8ff; text-align: center; margin: 0; padding: 20px; }
+        .game-title { color: #2c3e50; margin-bottom: 10px; }
+        
+        /* Поле карти */
+        #map-container {
             position: relative;
-        }
-
-        /* Стилізація карти */
-        svg {
-            width: 90%;
-            height: 90%;
-            filter: drop-shadow(0 0 10px rgba(0,0,0,0.5));
-        }
-
-        path {
-            fill: #444; /* Колір невідкритих країн */
-            stroke: #1a1a2e;
-            stroke-width: 0.5;
-            transition: 0.3s;
-            cursor: pointer;
-        }
-
-        path:hover {
-            fill: #666;
-            filter: brightness(1.2);
-        }
-
-        path.unlocked {
-            fill: #e94560 !important; /* Колір відкритих країн */
-        }
-
-        /* Модальне вікно */
-        #modal {
-            display: none;
-            position: fixed;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
+            width: 600px;
+            height: 450px;
             background: white;
-            color: #1a1a2e;
-            padding: 30px;
-            border-radius: 15px;
-            text-align: center;
-            z-index: 100;
-            box-shadow: 0 0 50px rgba(0,0,0,0.5);
-            width: 300px;
+            border: 3px solid #34495e;
+            margin: 20px auto;
+            border-radius: 10px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
         }
 
-        .btn {
-            background: #e94560;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            margin: 5px;
+        /* Зони куди ставити (тіні країн) */
+        .dropzone {
+            position: absolute;
+            border: 2px dashed #bdc3c7;
+            background: #ecf0f1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #95a5a6;
+            font-size: 12px;
             border-radius: 5px;
-            cursor: pointer;
-            width: 100%;
         }
 
-        #overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.7);
-            z-index: 90;
+        /* Країни, які ми тягнемо */
+        .country {
+            width: 100px;
+            height: 60px;
+            background: #27ae60;
+            color: white;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin: 10px;
+            cursor: grab;
+            border-radius: 8px;
+            font-weight: bold;
+            user-select: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
         }
+
+        .country:active { cursor: grabbing; }
+
+        .correct { background: #2ecc71 !important; border: 2px solid #27ae60; color: white !important; cursor: default; }
     </style>
 </head>
 <body>
 
-<header>
-    <span>🌍 Країн відкрито: <b id="count">0</b></span>
-    <span>🏆 Бали: <b id="score">0</b></span>
-</header>
+    <h1 class="game-title">Збери карту Європи</h1>
+    <p>Перетягніть назву країни на її правильне місце на карті!</p>
 
-<div id="game-canvas">
-    <svg viewBox="0 0 1000 800" xmlns="http://www.w3.org/2000/svg">
-        <path id="UA" d="M650,450 L720,430 L780,450 L820,520 L750,580 L680,560 L630,520 Z" onclick="askQuestion('UA', 'Україна', 'Яке місто є столицею?', ['Київ', 'Львів'], 0)"></path>
-        <path id="FR" d="M350,500 L420,480 L450,550 L400,620 L320,600 Z" onclick="askQuestion('FR', 'Франція', 'Яка річка протікає через Париж?', ['Темза', 'Сена'], 1)"></path>
-        <path id="PL" d="M550,400 L620,380 L640,450 L580,480 L530,450 Z" onclick="askQuestion('PL', 'Польща', 'Яке море омиває Польщу?', ['Балтійське', 'Чорне'], 0)"></path>
-        <path id="DE" d="M450,420 L530,400 L550,480 L480,530 L430,480 Z" onclick="askQuestion('DE', 'Німеччина', 'Як називається відомий автобан?', ['Нюрбургринг', 'Автобан'], 1)"></path>
-        <path id="IT" d="M480,550 L520,530 L580,650 L530,750 L500,680 Z" onclick="askQuestion('IT', 'Італія', 'Який вулкан знаходиться в Італії?', ['Етна', 'Олімп'], 0)"></path>
-        <path id="ES" d="M180,620 L280,600 L320,720 L220,750 L150,700 Z" onclick="askQuestion('ES', 'Іспанія', 'Який танець є національним?', ['Фламенко', 'Танго'], 0)"></path>
-        <path id="UK" d="M300,300 L350,280 L380,350 L320,450 L250,400 Z" onclick="askQuestion('UK', 'Велика Британія', 'Як звати короля/королеву?', ['Чарльз III', 'Луї XIV'], 0)"></path>
-    </svg>
-</div>
+    <div id="map-container">
+        <div class="dropzone" id="zone-ukraine" style="top: 200px; left: 380px; width: 140px; height: 90px;">Україна</div>
+        <div class="dropzone" id="zone-france" style="top: 220px; left: 80px; width: 100px; height: 80px;">Франція</div>
+        <div class="dropzone" id="zone-germany" style="top: 180px; left: 200px; width: 90px; height: 80px;">Німеччина</div>
+        <div class="dropzone" id="zone-italy" style="top: 320px; left: 210px; width: 70px; height: 90px;">Італія</div>
+        <div class="dropzone" id="zone-spain" style="top: 330px; left: 20px; width: 100px; height: 80px;">Іспанія</div>
+    </div>
 
-<div id="overlay"></div>
-<div id="modal">
-    <h2 id="m-name">Назва</h2>
-    <p id="m-quest">Питання</p>
-    <div id="options"></div>
-</div>
+    <div id="countries-pool">
+        <div class="country" draggable="true" id="ukraine">Україна</div>
+        <div class="country" draggable="true" id="germany">Німеччина</div>
+        <div class="country" draggable="true" id="france">Франція</div>
+        <div class="country" draggable="true" id="spain">Іспанія</div>
+        <div class="country" draggable="true" id="italy">Італія</div>
+    </div>
 
-<script>
-    let unlockedCount = 0;
-    let score = 0;
+    <script>
+        const countries = document.querySelectorAll('.country');
+        const zones = document.querySelectorAll('.dropzone');
 
-    function askQuestion(id, name, quest, opts, correct) {
-        const path = document.getElementById(id);
-        if (path.classList.contains('unlocked')) {
-            alert("Ви вже відкрили цю країну!");
-            return;
-        }
-
-        document.getElementById('m-name').innerText = name;
-        document.getElementById('m-quest').innerText = quest;
-        const optDiv = document.getElementById('options');
-        optDiv.innerHTML = '';
-
-        opts.forEach((o, i) => {
-            const b = document.createElement('button');
-            b.className = 'btn';
-            b.innerText = o;
-            b.onclick = () => {
-                if (i === correct) {
-                    alert("Правильно!");
-                    path.classList.add('unlocked');
-                    unlockedCount++;
-                    score += 100;
-                    document.getElementById('count').innerText = unlockedCount;
-                    document.getElementById('score').innerText = score;
-                } else {
-                    alert("Неправильно, спробуй ще!");
-                }
-                closeModal();
-            };
-            optDiv.appendChild(b);
+        countries.forEach(country => {
+            country.addEventListener('dragstart', e => {
+                e.dataTransfer.setData('text', e.target.id);
+            });
         });
 
-        document.getElementById('overlay').style.display = 'block';
-        document.getElementById('modal').style.display = 'block';
-    }
+        zones.forEach(zone => {
+            zone.addEventListener('dragover', e => {
+                e.preventDefault();
+            });
 
-    function closeModal() {
-        document.getElementById('overlay').style.display = 'none';
-        document.getElementById('modal').style.display = 'none';
-    }
-</script>
+            zone.addEventListener('drop', e => {
+                e.preventDefault();
+                const countryId = e.dataTransfer.getData('text');
+                const zoneId = e.target.id;
 
+                // Перевірка чи країна підходить до зони
+                if (zoneId === 'zone-' + countryId) {
+                    const countryEl = document.getElementById(countryId);
+                    e.target.innerHTML = countryEl.innerHTML;
+                    e.target.classList.add('correct');
+                    countryEl.style.visibility = 'hidden'; // Ховаємо використану кнопку
+                    checkWin();
+                } else {
+                    alert("Неправильно! Спробуй інше місце.");
+                }
+            });
+        });
+
+        function checkWin() {
+            if (document.querySelectorAll('.correct').length === 5) {
+                alert("Вітаємо! Ви зібрали карту Європи! 🎉");
+            }
+        }
+    </script>
 </body>
 </html>
